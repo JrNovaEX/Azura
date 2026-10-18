@@ -25,7 +25,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: release
+  # Per tag, not one shared group: a stuck run must not block the next
+  # release, and two different versions must never build at once.
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -92,7 +94,7 @@ jobs:
           git diff --stat
 
       - name: Commit and tag
-        id: tag
+        id: make-tag
         if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
@@ -108,12 +110,27 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Use the pushed tag
-        id: tag
+        id: use-tag
         if: github.event_name == 'push'
         run: |
           # The checkout must be the tagged commit, not the default branch.
           git checkout --detach "refs/tags/v$VERSION"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Exactly one of the two steps above ran, so the tag comes from
+      # whichever. Reading both and taking the one that produced a value
+      # keeps a single source for `needs.prepare.outputs.tag`.
+      - name: Report the tag
+        id: tag
+        run: |
+          tag="${{ steps.make-tag.outputs.tag }}"
+          [ -n "$tag" ] || tag="${{ steps.use-tag.outputs.tag }}"
+          if [ -z "$tag" ]; then
+            echo "::error::no tag was produced; this should not happen"
+            exit 1
+          fi
+          echo "Using $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build Linux
