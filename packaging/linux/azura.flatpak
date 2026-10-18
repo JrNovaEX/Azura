@@ -20,6 +20,10 @@ modules:
   - name: azura
     buildsystem: simple
     build-commands:
+      # Not `--offline`: the SDK has no vendored crates and GPUI's tree is
+      # large, so the sources have to be fetched first. `--locked` keeps
+      # Cargo.lock honest, so a build cannot silently pick up a new version.
+      - cargo fetch --locked
       - cargo build --release --offline
       - install -Dm755 target/release/azura /app/bin/azura
       - install -Dm644 packaging/linux/azura.desktop
