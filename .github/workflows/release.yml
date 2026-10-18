@@ -187,6 +187,9 @@ jobs:
   flatpak:
     name: Build the Flatpak
     needs: prepare
+    # Never blocks the release. The .deb is the recommended install and it
+    # comes from the build job, so a Flatpak problem must not hold up a
+    # version. Publish the Flatpak by hand once this is green again.
     runs-on: ubuntu-24.04
     env:
       # The version without the leading `v`, checked in prepare.
@@ -224,7 +227,8 @@ jobs:
 
   release:
     name: Draft the release
-    needs: [prepare, build, flatpak]
+    # `flatpak` is deliberately not required: see the note on that job.
+    needs: [prepare, build]
     # Pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19.
     runs-on: ubuntu-24.04
     env:
@@ -254,13 +258,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
+          # Only claim what was actually built. A Flatpak in the notes with
+          # no file beside it would be a broken promise.
+          flatpak_note=""
+          if [ -f dist/azura.flatpak ]; then
+            flatpak_note="| Flatpak | \`azura.flatpak\` |"
+          else
+            echo "::warning::no Flatpak in dist; leaving it out of the notes"
+          fi
+
           cat > notes.md <<EOF
           ## Download
 
           | System | File |
           | ------ | ---- |
           | Debian, Ubuntu, Mint (x86_64) | \`azura_$VERSION_amd64.deb\` |
-          | Flatpak | \`azura.flatpak\` |
+          $flatpak_note
           | Any Linux (x86_64) | \`azura-$VERSION-linux-x64.tar.gz\` |
 
           ### .deb
@@ -269,15 +282,7 @@ jobs:
           sudo apt install ./azura_$VERSION_amd64.deb
           \`\`\`
 
-          ### Flatpak
-
-          \`\`\`sh
-          flatpak install ./azura.flatpak
-          \`\`\`
-
-          The Flatpak runs inside a sandbox, so it cannot see your whole home
-          directory and some of your sessions will not find their applications.
-          The .deb is the better choice for day-to-day use.
+          This is the recommended one.
 
           ### Tarball
 
@@ -287,6 +292,21 @@ jobs:
 
           \`SHA256SUMS.txt\` lists a checksum for every file.
           EOF
+
+          if [ -f dist/azura.flatpak ]; then
+            cat >> notes.md <<'EOF'
+
+          ### Flatpak
+
+          ```sh
+          flatpak install ./azura.flatpak
+          ```
+
+          The Flatpak runs inside a sandbox, so it cannot see your whole home
+          directory and some of your sessions will not find their applications.
+          The .deb is the better choice for day-to-day use.
+          EOF
+          fi
           gh release create "$TAG" dist/* \
             --draft \
             --title "Azura $VERSION" \
