@@ -16,7 +16,10 @@ env:
 jobs:
   check:
     name: Format, lint and test
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`: that label moves to Ubuntu 26 on
+    # 2026-10-19, and a runner change should not be able to break the build
+    # on its own. Bump this deliberately, after a green run on the new one.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

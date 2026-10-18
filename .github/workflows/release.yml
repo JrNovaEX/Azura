@@ -38,7 +38,8 @@ env:
 jobs:
   prepare:
     name: Bump version and tag
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19.
+    runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
       # Without the leading `v`, because that is what the file names use.
@@ -207,7 +208,8 @@ jobs:
   release:
     name: Draft the release
     needs: [prepare, build, flatpak]
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19.
+    runs-on: ubuntu-24.04
     env:
       # The version without the leading `v`, checked in prepare.
       VERSION: ${{ needs.prepare.outputs.version }}
