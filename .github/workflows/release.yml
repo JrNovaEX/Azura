@@ -1,13 +1,23 @@
 name: Release
 
-# Run by hand from the Actions tab ("Run workflow"). It asks for the version,
-# bumps it in Cargo.toml, tags the commit, builds Roshan for every platform and
-# creates a draft GitHub Release to review and publish.
+# Two ways in:
+#
+#   * push a tag:  `git tag v1.0.2 && git push origin v1.0.2`
+#   * by hand:     the Actions tab, "Run workflow", with a version
+#
+# Either way it builds the .deb, the Flatpak bundle and the update tarball,
+# then creates a **draft** release to review before publishing. The tag route
+# is the one to reach for; the manual route also bumps Cargo.toml for you.
 on:
+  push:
+    tags:
+      # GitHub matches these with glob patterns, not regular expressions, so
+      # this is "starts with v, then something like 1.0.2".
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release, without the v (for example 0.2.0)"
+        description: "Version to release, without the v (for example 1.0.2)"
         required: true
         type: string
 
@@ -19,7 +29,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VERSION: ${{ inputs.version }}
+  # With a tag push the version comes from the tag, which carries a leading
+  # `v` (`github.ref_name` is "v1.0.2"). The file names Azura's updater looks
+  # for have no `v`, so it is stripped in the `version` job below.
+  VERSION: ${{ inputs.version || github.ref_name }}
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -28,29 +41,49 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
+      # Without the leading `v`, because that is what the file names use.
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Check the version
+        id: version
         run: |
-          if [ "$GITHUB_REF_TYPE" != "branch" ]; then
-            echo "::error::Run this workflow from a branch, not from a tag"
-            exit 1
-          fi
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+          version="${VERSION#v}"
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
             echo "::error::'$VERSION' is not a version like 1.2.3 or 1.2.3-beta.1"
             exit 1
           fi
-          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-            echo "::error::v$VERSION was already released"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+            && git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version was already released"
             exit 1
           fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Everything downstream uses this, not the raw input.
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
+      # With a tag push the tag is already there and the version bump has
+      # already been committed, so only the manual route does this.
       - uses: dtolnay/rust-toolchain@stable
+        if: github.event_name == 'workflow_dispatch'
+
+      # With a tag push the version was already committed, so this must agree
+      # with the tag or the .deb would claim a version the code does not have.
+      - name: Check the tag matches Cargo.toml
+        if: github.event_name == 'push'
+        run: |
+          declared="$(sed -n -E '0,/^version = "([^"]*)"/{s//\1/p}' Cargo.toml)"
+          if [ "$declared" != "$VERSION" ]; then
+            echo "::error::tag v$VERSION but Cargo.toml says $declared"
+            exit 1
+          fi
+          echo "Cargo.toml says $declared"
 
       - name: Set the version in Cargo.toml
+        if: github.event_name == 'workflow_dispatch'
         run: |
           # Only the [workspace.package] version, which every crate inherits.
           sed -i -E '0,/^version = "[^"]*"/s//version = "'"$VERSION"'"/' Cargo.toml
@@ -59,6 +92,7 @@ jobs:
 
       - name: Commit and tag
         id: tag
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -72,94 +106,111 @@ jobs:
           git push origin "HEAD:refs/heads/$GITHUB_REF_NAME" "v$VERSION"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Use the pushed tag
+        id: tag
+        if: github.event_name == 'push'
+        run: |
+          # The checkout must be the tagged commit, not the default branch.
+          git checkout --detach "refs/tags/v$VERSION"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
   build:
-    name: Build (${{ matrix.name }})
+    name: Build Linux
     needs: prepare
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: windows-x64
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-            test: true
-          - name: macos-arm64
-            os: macos-latest
-            target: aarch64-apple-darwin
-            test: true
-          - name: macos-x64
-            os: macos-latest
-            target: x86_64-apple-darwin
-            test: false
-          - name: linux-x64
-            os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            test: true
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
+    env:
+      # The version without the leading `v`, checked in prepare.
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.prepare.outputs.tag }}
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      - name: Linux system libraries
-        if: runner.os == 'Linux'
+      - name: System libraries
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
-            libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev
+            libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev \
+            libgl1-mesa-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-xfixes0-dev \
+            libxcb-cursor-dev libssl-dev dpkg-dev fakeroot
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
 
       - name: Test
-        if: matrix.test
-        run: cargo test --release --target ${{ matrix.target }}
+        run: cargo test --release
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
-      - name: Install Inno Setup
-        if: runner.os == 'Windows'
-        run: choco install innosetup --no-progress -y
+      - name: Build the .deb
+        run: packaging/linux/build-deb.sh "$VERSION" target/release/azura dist
 
-      # Windows ships an installer only (Roshan-Setup-<version>.exe); the
-      # in-app updater downloads and runs the same file.
-      - name: Package (Windows installer)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: >
-          ./packaging/windows/build-installer.ps1 -Version $env:VERSION
-          -ReleaseDir "target/${{ matrix.target }}/release" -OutDir dist
-
-      - name: Package (macOS and Linux)
-        if: runner.os != 'Windows'
+      # The tarball is what the in-app updater downloads, so its name has to
+      # stay in step with `is_archive` in azura-platform/src/update.rs.
+      - name: Build the update tarball
         run: |
-          name="roshan-$VERSION-${{ matrix.name }}"
+          name="azura-$VERSION-linux-x64"
           mkdir -p "dist/$name"
-          cp "target/${{ matrix.target }}/release/roshan" "dist/$name/"
+          cp target/release/azura "dist/$name/"
           cp README.md LICENSE "dist/$name/"
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            cp packaging/linux/roshan.desktop "dist/$name/"
-            cp crates/roshan/assets/logo/roshan.png "dist/$name/roshan.png"
-          fi
+          cp packaging/linux/azura.desktop "dist/$name/"
+          cp crates/azura/assets/logo/azura.png "dist/$name/azura.png"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
           rm -rf "dist/$name"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: roshan-${{ matrix.name }}
+          name: linux-x64
           path: dist/*
+          if-no-files-found: error
+
+  flatpak:
+    name: Build the Flatpak
+    needs: prepare
+    runs-on: ubuntu-24.04
+    env:
+      # The version without the leading `v`, checked in prepare.
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --user flathub \
+            org.freedesktop.Sdk//24.08 \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Platform.openh264//24.08 || \
+          flatpak install -y --user flathub org.freedesktop.Sdk//24.08 \
+            org.freedesktop.Platform//24.08
+
+      - name: Build
+        run: |
+          flatpak-builder --user --force-clean --repo=repo \
+            build packaging/linux/azura.flatpak
+          flatpak build-bundle repo dist/azura.flatpak \
+            io.github.jrnovaex.azura stable
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: dist/azura.flatpak
           if-no-files-found: error
 
   release:
     name: Draft the release
-    needs: [prepare, build]
+    needs: [prepare, build, flatpak]
     runs-on: ubuntu-latest
+    env:
+      # The version without the leading `v`, checked in prepare.
+      VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,6 +220,9 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      - name: List what was built
+        run: ls -la dist
 
       - name: Checksums
         run: |
@@ -186,26 +240,37 @@ jobs:
 
           | System | File |
           | ------ | ---- |
-          | Windows 10 and 11 | \`Roshan-Setup-$VERSION.exe\` |
-          | macOS (Apple silicon) | \`roshan-$VERSION-macos-arm64.tar.gz\` |
-          | macOS (Intel) | \`roshan-$VERSION-macos-x64.tar.gz\` |
-          | Linux (x86_64) | \`roshan-$VERSION-linux-x64.tar.gz\` |
+          | Debian, Ubuntu, Mint (x86_64) | \`azura_$VERSION_amd64.deb\` |
+          | Flatpak | \`azura.flatpak\` |
+          | Any Linux (x86_64) | \`azura-$VERSION-linux-x64.tar.gz\` |
 
-          On Windows, run the setup. It installs just for you, with no
-          administrator rights, and adds Roshan to the Start menu. Windows may say
-          "Windows protected your PC" because the setup is not signed with a paid
-          certificate. Click **More info**, then **Run anyway**. Roshan updates
-          itself after that.
+          ### .deb
 
-          The macOS and Linux builds have not been tested on real machines yet.
-          macOS will also ask for confirmation the first time, because the app is
-          not notarized.
+          \`\`\`sh
+          sudo apt install ./azura_$VERSION_amd64.deb
+          \`\`\`
+
+          ### Flatpak
+
+          \`\`\`sh
+          flatpak install ./azura.flatpak
+          \`\`\`
+
+          The Flatpak runs inside a sandbox, so it cannot see your whole home
+          directory and some of your sessions will not find their applications.
+          The .deb is the better choice for day-to-day use.
+
+          ### Tarball
+
+          Unpack it and run \`./azura\`. This is also the file Azura downloads
+          when it finds a new version; it checks the file against
+          \`SHA256SUMS.txt\` and then leaves installing it to you.
 
           \`SHA256SUMS.txt\` lists a checksum for every file.
           EOF
           gh release create "$TAG" dist/* \
             --draft \
-            --title "Roshan $VERSION" \
+            --title "Azura $VERSION" \
             --notes-file notes.md \
             --generate-notes \
             --verify-tag

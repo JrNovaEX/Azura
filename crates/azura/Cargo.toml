@@ -1,0 +1,22 @@
+[package]
+name = "azura"
+description = "Azura (آزورا): launch your apps and commands together, in order"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+azura-core = { path = "../azura-core" }
+azura-platform = { path = "../azura-platform" }
+gpui-kit = "0.7"
+# The two below are already in GPUI's dependency tree.
+futures = "0.3"
+rust-embed = { version = "8", features = ["include-exclude"] }
+toml = "0.9"
+
+[dev-dependencies]
+# Used by `examples/package.rs` to write the .deb and Flatpak icons.
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[build-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }

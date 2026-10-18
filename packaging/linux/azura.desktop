@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Azura
+Name[fa]=آزورا
+Comment=Launch your apps and commands together, in order
+Comment[fa]=برنامه‌ها و دستورهات رو با هم و به ترتیب اجرا کن
+Exec=azura
+Icon=azura
+Terminal=false
+Categories=Utility;
+StartupWMClass=azura

@@ -1,7 +1,7 @@
 name: CI
 
-# Quick checks on every push and pull request, on Linux only so results come
-# back fast. Windows and macOS are built by the Release workflow.
+# Format, lint and test on every push and pull request. Linux is the only
+# platform Azura supports, so this is the whole matrix.
 on:
   push:
   pull_request:
@@ -15,7 +15,7 @@ env:
 
 jobs:
   check:
-    name: Format, lint and test (Linux)
+    name: Format, lint and test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +26,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
-            libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev
+            libvulkan-dev libx11-xcb-dev libxcb1-dev libfontconfig-dev libfreetype-dev \
+            libgl1-mesa-dev libxcb-shape0-dev libxcb-randr0-dev libxcb-xfixes0-dev \
+            libxcb-cursor-dev libxcb1-dev libssl-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - name: The app still builds
+        run: cargo build --release

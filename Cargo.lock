@@ -537,6 +537,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "azura"
+version = "1.0.1"
+dependencies = [
+ "azura-core",
+ "azura-platform",
+ "futures",
+ "gpui-kit",
+ "image",
+ "rust-embed",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "azura-core"
+version = "1.0.1"
+dependencies = [
+ "serde",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "azura-platform"
+version = "1.0.1"
+dependencies = [
+ "azura-core",
+ "dirs 6.0.0",
+ "image",
+ "libc",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "ureq",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2808,6 +2847,8 @@ dependencies = [
 [[package]]
 name = "gpui-pre-windows"
 version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f05592a6f9e3e6bb7a9f2a0d4779271cf747a948db1c07b02448de777ffff8f3"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -5609,49 +5650,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4045a00dc327d084a2bbf126976e14125b54f23bd30511d45b842eba76c52d74"
 dependencies = [
  "str_indices",
-]
-
-[[package]]
-name = "roshan"
-version = "1.0.1"
-dependencies = [
- "anyhow",
- "embed-resource",
- "futures",
- "gpui-kit",
- "image",
- "roshan-core",
- "roshan-platform",
- "rust-embed",
- "toml 0.9.12+spec-1.1.0",
-]
-
-[[package]]
-name = "roshan-core"
-version = "1.0.1"
-dependencies = [
- "serde",
- "tempfile",
- "thiserror 2.0.21",
- "toml 0.9.12+spec-1.1.0",
-]
-
-[[package]]
-name = "roshan-platform"
-version = "1.0.1"
-dependencies = [
- "dirs 6.0.0",
- "image",
- "objc2 0.6.4",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "roshan-core",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "tempfile",
- "ureq",
- "windows 0.62.2",
 ]
 
 [[package]]

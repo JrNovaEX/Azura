@@ -1,13 +1,13 @@
-/* Shared look for Roshan's posters: the app's own palette (charcoal tile,
+/* Shared look for Azura's posters: the app's own palette (charcoal tile,
    cream bowl, one amber light), no gradients, no glows. 1280x640 canvas. */
 @font-face {
   font-family: "Vazirmatn";
-  src: url("../../../crates/roshan/assets/fonts/Vazirmatn-Bold.ttf");
+  src: url("../../../crates/azura/assets/fonts/Vazirmatn-Bold.ttf");
   font-weight: 700;
 }
 @font-face {
   font-family: "Vazirmatn";
-  src: url("../../../crates/roshan/assets/fonts/Vazirmatn-Regular.ttf");
+  src: url("../../../crates/azura/assets/fonts/Vazirmatn-Regular.ttf");
   font-weight: 400;
 }
 
