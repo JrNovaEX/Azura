@@ -5,9 +5,9 @@ name: Release
 #   * push a tag:  `git tag v1.0.2 && git push origin v1.0.2`
 #   * by hand:     the Actions tab, "Run workflow", with a version
 #
-# Either way it builds the .deb, the Flatpak bundle and the update tarball,
-# then creates a **draft** release to review before publishing. The tag route
-# is the one to reach for; the manual route also bumps Cargo.toml for you.
+# Either way it builds the .deb and the update tarball, then creates a
+# **draft** release to review before publishing. The tag route is the one to
+# reach for; the manual route also bumps Cargo.toml for you.
 on:
   push:
     tags:
@@ -184,50 +184,8 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  flatpak:
-    name: Build the Flatpak
-    needs: prepare
-    # Never blocks the release. The .deb is the recommended install and it
-    # comes from the build job, so a Flatpak problem must not hold up a
-    # version. Publish the Flatpak by hand once this is green again.
-    runs-on: ubuntu-24.04
-    env:
-      # The version without the leading `v`, checked in prepare.
-      VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.tag }}
-
-      - name: Install flatpak-builder
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak-builder
-          flatpak remote-add --user --if-not-exists flathub \
-            https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install -y --user flathub \
-            org.freedesktop.Sdk//24.08 \
-            org.freedesktop.Platform//24.08 \
-            org.freedesktop.Platform.openh264//24.08 || \
-          flatpak install -y --user flathub org.freedesktop.Sdk//24.08 \
-            org.freedesktop.Platform//24.08
-
-      - name: Build
-        run: |
-          flatpak-builder --user --force-clean --repo=repo \
-            build packaging/linux/azura.flatpak
-          flatpak build-bundle repo dist/azura.flatpak \
-            io.github.jrnovaex.azura stable
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: flatpak
-          path: dist/azura.flatpak
-          if-no-files-found: error
-
   release:
     name: Draft the release
-    # `flatpak` is deliberately not required: see the note on that job.
     needs: [prepare, build]
     # Pinned: `ubuntu-latest` moves to Ubuntu 26 on 2026-10-19.
     runs-on: ubuntu-24.04
@@ -258,22 +216,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          # Only claim what was actually built. A Flatpak in the notes with
-          # no file beside it would be a broken promise.
-          flatpak_note=""
-          if [ -f dist/azura.flatpak ]; then
-            flatpak_note="| Flatpak | \`azura.flatpak\` |"
-          else
-            echo "::warning::no Flatpak in dist; leaving it out of the notes"
-          fi
-
           cat > notes.md <<EOF
           ## Download
 
           | System | File |
           | ------ | ---- |
           | Debian, Ubuntu, Mint (x86_64) | \`azura_$VERSION_amd64.deb\` |
-          $flatpak_note
           | Any Linux (x86_64) | \`azura-$VERSION-linux-x64.tar.gz\` |
 
           ### .deb
@@ -292,21 +240,6 @@ jobs:
 
           \`SHA256SUMS.txt\` lists a checksum for every file.
           EOF
-
-          if [ -f dist/azura.flatpak ]; then
-            cat >> notes.md <<'EOF'
-
-          ### Flatpak
-
-          ```sh
-          flatpak install ./azura.flatpak
-          ```
-
-          The Flatpak runs inside a sandbox, so it cannot see your whole home
-          directory and some of your sessions will not find their applications.
-          The .deb is the better choice for day-to-day use.
-          EOF
-          fi
           gh release create "$TAG" dist/* \
             --draft \
             --title "Azura $VERSION" \

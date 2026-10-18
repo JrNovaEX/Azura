@@ -14,9 +14,7 @@ futures = "0.3"
 rust-embed = { version = "8", features = ["include-exclude"] }
 toml = "0.9"
 
-[dev-dependencies]
-# Used by `examples/package.rs` to write the .deb and Flatpak icons.
-image = { version = "0.25", default-features = false, features = ["png"] }
-
 [build-dependencies]
+# build.rs downscales the logo for the UI. The icon-theme sizes for the .deb
+# are produced by packaging/linux/build-deb.sh, which uses Pillow instead.
 image = { version = "0.25", default-features = false, features = ["png"] }

@@ -84,7 +84,6 @@ Azura is for Linux. Get the latest version from the
 | System | File |
 | ------ | ---- |
 | Debian, Ubuntu, Mint, and other `.deb` distros (x86_64) | `azura_<version>_amd64.deb` |
-| Flatpak | `azura.flatpak` |
 | Any Linux (x86_64) | `azura-<version>-linux-x64.tar.gz` |
 
 ### The .deb
@@ -95,16 +94,6 @@ sudo apt install ./azura_<version>_amd64.deb
 
 Azura shows up in your app menu, and you can remove it any time with
 `sudo apt remove azura`. Removing it leaves your sessions alone.
-
-### Flatpak
-
-```sh
-flatpak install ./azura.flatpak
-```
-
-> **Prefer the .deb.** The Flatpak runs in a sandbox, so it cannot see your
-> whole home directory and some of your sessions will not find the apps they
-> name. Use the .deb for day-to-day use.
 
 ### Tarball
 

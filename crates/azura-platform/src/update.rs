@@ -6,9 +6,8 @@
 //! against `SHA256SUMS.txt` before keeping it. Nothing about the user is sent.
 //!
 //! Azura never installs anything itself. Linux has no single install path —
-//! a `.deb`, a Flatpak and a hand-copied binary are three different jobs — so
-//! an update stops at a verified download and sends the user to the release
-//! page to put it in place.
+//! a `.deb` and a hand-unpacked tarball are two different jobs — so an update
+//! stops at a verified download and leaves installing it to you.
 
 use std::fs;
 use std::io::{Read, Write};

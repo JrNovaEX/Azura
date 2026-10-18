@@ -71,7 +71,7 @@ crates/
     assets/           icons (Lucide subset), fonts (Vazirmatn), logo
     build.rs          logo sizes for the UI
 docs/                 DEVELOPMENT.md, media/ (posters and their HTML sources)
-packaging/linux/      .desktop file, build-deb.sh, azura.flatpak
+packaging/linux/      .desktop file and build-deb.sh
 ```
 
 Keep the dependency direction: `azura` → `azura-platform` → `azura-core`.
@@ -142,9 +142,8 @@ cross-compilation to arrange.
 ## Releases
 
 Manual only: Actions → **Release** → enter a version. It bumps `Cargo.toml`,
-tags, builds the Linux `.deb`, the Flatpak bundle and
-`azura-<version>-linux-x64.tar.gz`, and creates a **draft** release for
-review.
+tags, builds the Linux `.deb` and the `azura-<version>-linux-x64.tar.gz`,
+and creates a **draft** release for review.
 
 Two file names have to stay in step:
 

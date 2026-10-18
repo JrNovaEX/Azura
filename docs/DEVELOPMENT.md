@@ -160,7 +160,7 @@ crates/
   azura-core/       model, TOML config, launch engine. No OS or UI code.
   azura-platform/   discovery, icons, launching, the single-instance lock
   azura/            the GPUI app: screens, overlays, theme, translations
-packaging/linux/     the .deb script and the Flatpak manifest
+packaging/linux/     the .desktop file and the .deb script
 ```
 
 The dependency direction is `azura` → `azura-platform` → `azura-core`.
@@ -223,8 +223,8 @@ When a newer release exists, its `azura-<version>-linux-x64.tar.gz` is
 downloaded into `~/.cache/Azura/updates` and checked against the
 `SHA256SUMS.txt` entry for that exact file name. On a mismatch the download is
 deleted and nothing is kept. Azura then shows you where the file is and stops
-there: installing is yours to do, because a `.deb`, a Flatpak and a
-hand-unpacked tarball are three different jobs.
+there: installing is yours to do, because a `.deb` and a hand-unpacked
+tarball are two different jobs.
 
 `--updated` is the flag a user can pass after reinstalling by hand; Azura
 shows a short "up to date" notice and nothing else.
@@ -250,31 +250,26 @@ the `ar` archive with `dpkg-deb` when that is available and by hand when it is
 not. Uninstalling leaves `~/.config/Azura` alone: the sessions are the user's,
 not ours.
 
-`packaging/linux/azura.flatpak` is a [flatpak-builder](https://docs.flatpak.org)
-manifest. It needs the freedesktop 24.08 SDK:
-
-```sh
-flatpak-builder --user --force-clean --repo=repo build packaging/linux/azura.flatpak
-flatpak build-bundle repo dist/azura.flatpak io.github.jrnovaex.azura stable
-```
-
-> The Flatpak is a sandbox, so Azura inside it cannot see the whole home
-> directory and some sessions will not find the apps they name. The `.deb` is
-> the better choice.
-
 ## Releasing
 
-Releases are made by hand with the **Release** workflow:
+Releases are made by tagging, or by hand from the **Actions** tab. Both build
+the same thing:
 
-1. Open the repository's **Actions** tab, choose **Release**, then
-   **Run workflow** on the `main` branch.
-2. Enter the new version without the `v`, for example `0.2.3`.
-3. The workflow checks the version, sets it in `Cargo.toml`, commits
-   "Release v0.2.3", tags it `v0.2.3`, then builds the Linux release: the
-   `.deb`, the Flatpak bundle, and the `azura-0.2.3-linux-x64.tar.gz` that
-   the in-app updater downloads. Tests run first.
-4. It then creates a **draft** release with those files, a `SHA256SUMS.txt`
-   and generated notes. Review it on the Releases page and publish it.
+```sh
+git tag v0.2.3
+git push origin v0.2.3
+```
+
+1. The workflow checks that the tag looks like a version and matches the
+   version in `Cargo.toml`, so the `.deb` cannot claim a version the code does
+   not have.
+2. It runs the tests, then builds `azura_<version>_amd64.deb` and
+   `azura-<version>-linux-x64.tar.gz` (the file the in-app updater downloads).
+3. It creates a **draft** release with those files and a `SHA256SUMS.txt`.
+   Review it on the Releases page, then publish it.
+
+Running it by hand from the Actions tab instead also bumps `Cargo.toml`,
+commits and pushes that, and creates the tag for you.
 
 ## Licenses of bundled material
 
